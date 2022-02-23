@@ -2,6 +2,8 @@ from taxifare.data import get_data, clean_data, holdout
 from taxifare.pipeline import get_pipeline
 from taxifare.utils import compute_rmse
 import joblib
+from google.cloud import storage
+from taxifare.data import BUCKET_NAME, BUCKET_MODEL_PATH
 
 class Trainer:
     def __init__(self, nrows=100, estimator="RandomForest"):
@@ -20,8 +22,16 @@ class Trainer:
         rmse = compute_rmse(y_pred, y_test)
         return rmse
     
+    def upload_to_gcp(self, filename):
+        client = storage.Client()
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(f"{BUCKET_MODEL_PATH}/{filename}")
+        blob.upload_from_filename(filename)
+    
     def save_model(self):
-        joblib.dump(self.pipeline, f"{self.estimator}.joblib")
+        filename = f"{self.estimator}.joblib"
+        joblib.dump(self.pipeline, filename)
+        self.upload_to_gcp(filename)
     
     def train(self):
         print("get data")
@@ -52,3 +62,7 @@ class Trainer:
 
         print("save model")
         self.save_model()
+
+if __name__ == "__main__":
+    trainer = Trainer()
+    trainer.train()
